@@ -1,70 +1,80 @@
-import base64
-from io import BytesIO
-from PIL import Image
 import streamlit as st
-from openai import OpenAI
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+st.set_page_config(page_title="二次元真人化提示詞工具", page_icon="✨")
 
-st.set_page_config(page_title="二次元真人化工具")
-st.title("二次元真人化工具")
+st.title("二次元真人化提示詞工具")
+st.caption("免費版：產生提示詞後，回到 ChatGPT 上傳圖片使用。")
 
-uploaded_file = st.file_uploader("上傳二次元圖片", type=["png", "jpg", "jpeg", "webp"])
-
-prompt = st.text_area(
-    "想轉換成什麼樣子？",
-    value="請將上傳圖片轉換為亞洲真人寫實風格，保留原角色的核心辨識特徵、髮型輪廓、表情氣質與服裝元素。自然膚質、真實五官、柔和光線，不要保留動漫線條。"
+uploaded_file = st.file_uploader(
+    "上傳參考圖片，這裡只做預覽，不會送出扣費",
+    type=["png", "jpg", "jpeg", "webp"]
 )
 
-def to_png_file(image_bytes, name="image.png"):
-    img = Image.open(BytesIO(image_bytes)).convert("RGB")
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    buffer.name = name
-    return buffer
-
-def edit_image(image_bytes, prompt_text):
-    img_file = to_png_file(image_bytes)
-
-    result = client.images.edit(
-        model="gpt-image-1",
-        image=img_file,
-        prompt=prompt_text,
-        size="auto"
-    )
-
-    return base64.b64decode(result.data[0].b64_json)
-
 if uploaded_file:
-    original_bytes = uploaded_file.getvalue()
-    st.image(original_bytes, caption="原始圖片")
+    st.image(uploaded_file, caption="參考圖片預覽", use_container_width=True)
 
-    if st.button("開始轉換"):
-        with st.spinner("真人化轉換中..."):
-            st.session_state["result_image"] = edit_image(original_bytes, prompt)
-        st.rerun()
+st.subheader("角色基本設定")
 
-if "result_image" in st.session_state:
-    st.subheader("轉換結果")
-    st.image(st.session_state["result_image"])
+age = st.selectbox("年齡設定", ["20歲", "22歲", "24歲", "26歲", "30歲", "35歲"])
+style = st.selectbox("真人風格", ["台灣女性", "亞洲女性", "日系寫實", "韓系寫實"])
+hair_color = st.selectbox("髮色", ["保留原髮色", "淺棕色", "深棕色", "黑色", "亞麻棕"])
+hair_style = st.selectbox("髮型", ["保留原髮型", "高馬尾", "長直髮", "微捲長髮", "短髮", "公主頭"])
+expression = st.selectbox("神情", ["保留原神情", "甜美可愛", "氣質溫柔", "俏皮淘氣", "成熟嫵媚", "曖昧迷人"])
+photo_style = st.selectbox("攝影風格", ["自然寫實攝影", "高級人像攝影", "電影感光影", "日系清新寫真", "韓系雜誌風"])
 
-    edit_prompt = st.text_area(
-        "後續修改文字",
-        placeholder="例如：改成淺棕色長髮、高馬尾、眼神更溫柔"
+st.subheader("常用角色模式")
+
+mode = st.radio(
+    "套用模式",
+    ["一般模式", "Vivi模式", "Joan模式"]
+)
+
+extra = st.text_area(
+    "其他補充要求",
+    placeholder="例如：背景改成台北街景、服裝保留原設計、眼神更溫柔、不要歐美臉",
+    height=100
+)
+
+base_prompt = f"""
+請將我上傳的二次元圖片轉換為真人圖像風格。
+
+角色設定：
+- 年齡：{age}
+- 風格：{style}
+- 髮色：{hair_color}
+- 髮型：{hair_style}
+- 神情：{expression}
+- 攝影風格：{photo_style}
+
+請保留原角色的核心辨識特徵，包括臉型輪廓、髮型結構、表情氣質、服裝元素與整體氛圍。
+請轉換為真實自然的人像攝影效果，膚質自然、五官真實、光線柔和。
+避免動漫線條、塑膠感、過度修圖、歐美臉或臉部失真。
+"""
+
+if mode == "Vivi模式":
+    base_prompt += """
+角色偏向 Vivi 風格：甜美、俏皮、青春活潑、鄰家女孩氣質，神情帶有可愛淘氣感。
+"""
+
+elif mode == "Joan模式":
+    base_prompt += """
+角色偏向 Joan 風格：氣質清新、知性自然、成熟溫柔，整體呈現都會女性的人像質感。
+"""
+
+if extra.strip():
+    base_prompt += f"""
+
+額外要求：
+{extra}
+"""
+
+st.subheader("產生提示詞")
+
+if st.button("產生提示詞"):
+    st.text_area(
+        "複製下面這段，回到 ChatGPT 上傳圖片後貼上",
+        value=base_prompt.strip(),
+        height=360
     )
 
-    if st.button("再次修改"):
-        with st.spinner("依照文字修改中..."):
-            st.session_state["result_image"] = edit_image(
-                st.session_state["result_image"],
-                edit_prompt
-            )
-        st.rerun()
-
-    st.download_button(
-        "下載圖片",
-        data=st.session_state["result_image"],
-        file_name="realistic_result.png",
-        mime="image/png"
-    )
+    st.success("提示詞已產生。複製後回到 ChatGPT 使用即可。")
