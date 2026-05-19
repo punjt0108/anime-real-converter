@@ -17,7 +17,7 @@ prompt = st.text_area(
 )
 
 def to_png_file(image_bytes, name="image.png"):
-    img = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    img = Image.open(BytesIO(image_bytes)).convert("RGB")
     buffer = BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
@@ -31,7 +31,7 @@ def edit_image(image_bytes, prompt_text):
         model="gpt-image-1",
         image=img_file,
         prompt=prompt_text,
-        size="1024x1024"
+        size="auto"
     )
 
     return base64.b64decode(result.data[0].b64_json)
